@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: theboxburger-postgres
+    environment:
+      POSTGRES_DB: theboxburger
+      POSTGRES_USER: theboxburger
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-theboxburger_pass}
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U theboxburger"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: theboxburger-backend
+    environment:
+      DATABASE_URL: postgresql://theboxburger:${DB_PASSWORD:-theboxburger_pass}@postgres:5432/theboxburger
+      JWT_SECRET: ${JWT_SECRET:-cambiar_por_secreto_seguro}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-cambiar_por_secreto_seguro}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      PORT: 3001
+      TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - VITE_APP_VERSION=1.0.0
+    container_name: theboxburger-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

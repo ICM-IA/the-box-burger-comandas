@@ -13,6 +13,7 @@ export default function Header({ localId, onLocalChange }) {
   const { conectado } = useSocket();
   const navigate = useNavigate();
   const [hora, setHora] = useState('');
+  const esAdmin = usuario?.rol === 'admin';
 
   useEffect(() => {
     const tick = () => {
@@ -23,24 +24,37 @@ export default function Header({ localId, onLocalChange }) {
     return () => clearInterval(id);
   }, []);
 
+  // Si no es admin, forzar su local automáticamente
+  useEffect(() => {
+    if (!esAdmin && usuario?.local_id) {
+      onLocalChange && onLocalChange(usuario.local_id);
+    }
+  }, [usuario]);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const localNombre = LOCALES.find(l => l.id === (localId || usuario?.local_id))?.nombre || 'Sin local';
+
   return (
     <header className="header">
       <div className="header-local">
         🏠
-        <select
-          value={localId || ''}
-          onChange={(e) => onLocalChange && onLocalChange(e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">Todos los locales</option>
-          {LOCALES.map((l) => (
-            <option key={l.id} value={l.id}>{l.nombre}</option>
-          ))}
-        </select>
+        {esAdmin ? (
+          <select
+            value={localId || ''}
+            onChange={(e) => onLocalChange && onLocalChange(e.target.value ? Number(e.target.value) : null)}
+          >
+            <option value="">Todos los locales</option>
+            {LOCALES.map((l) => (
+              <option key={l.id} value={l.id}>{l.nombre}</option>
+            ))}
+          </select>
+        ) : (
+          <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--primary)' }}>{localNombre}</span>
+        )}
       </div>
 
       <div className="header-spacer" />

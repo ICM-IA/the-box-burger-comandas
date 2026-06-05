@@ -8,6 +8,7 @@ const IconDelivery  = () => <svg width="20" height="20" fill="none" stroke="curr
 const IconCaja      = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>;
 const IconEmpleados = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const IconChevron   = ({ right }) => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d={right ? 'M9 18l6-6-6-6' : 'M15 18l-6-6 6-6'}/></svg>;
+const IconFichaje   = () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>;
 
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
@@ -18,6 +19,7 @@ export default function Sidebar() {
     { to: '/delivery',  icon: <IconDelivery />,  label: 'Delivery',  roles: ['admin', 'repartidor', 'cajero'] },
     { to: '/caja',      icon: <IconCaja />,      label: 'Caja',      roles: ['admin', 'cajero'] },
     { to: '/empleados', icon: <IconEmpleados />, label: 'Empleados', roles: ['admin'] },
+    { to: '/fichaje',   icon: <IconFichaje />,   label: 'Fichaje',   roles: ['admin', 'cajero'] },
   ].filter((l) => l.roles.includes(usuario?.rol));
 
   // El rol empleado tiene su propia página sin sidebar

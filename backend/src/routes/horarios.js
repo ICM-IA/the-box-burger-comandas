@@ -91,6 +91,60 @@ router.get('/estado-hoy', async (req, res) => {
   }
 });
 
+// POST /api/horarios/fichar-empleado — admin ficha a un empleado con su contraseña
+router.post('/fichar-empleado', async (req, res) => {
+  const bcrypt = require('bcryptjs');
+  const { email, password, accion } = req.body; // accion: 'entrada' | 'salida'
+
+  if (!email || !password || !accion) {
+    return res.status(400).json({ error: 'Faltan campos: email, password, accion' });
+  }
+
+  try {
+    // Verificar credenciales del empleado
+    const userRes = await pool.query(
+      `SELECT * FROM usuarios WHERE email = $1 AND activo = true`,
+      [email.toLowerCase().trim()]
+    );
+    const usuario = userRes.rows[0];
+    if (!usuario) return res.status(401).json({ error: 'Usuario no encontrado' });
+
+    const ok = await bcrypt.compare(password, usuario.password_hash);
+    if (!ok) return res.status(401).json({ error: 'Contraseña incorrecta' });
+
+    // Ver registro de hoy
+    const hoyRes = await pool.query(
+      `SELECT * FROM horarios WHERE usuario_id = $1 AND fecha = CURRENT_DATE`,
+      [usuario.id]
+    );
+    const hoy = hoyRes.rows[0];
+
+    if (accion === 'entrada') {
+      if (hoy?.hora_entrada) return res.status(400).json({ error: `${usuario.nombre} ya registró su entrada hoy a las ${new Date(hoy.hora_entrada).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}` });
+      const result = await pool.query(
+        `INSERT INTO horarios (usuario_id, fecha, hora_entrada) VALUES ($1, CURRENT_DATE, NOW()) RETURNING *`,
+        [usuario.id]
+      );
+      return res.json({ accion: 'entrada', nombre: `${usuario.nombre} ${usuario.apellido}`, registro: result.rows[0] });
+    }
+
+    if (accion === 'salida') {
+      if (!hoy?.hora_entrada) return res.status(400).json({ error: `${usuario.nombre} no registró entrada hoy` });
+      if (hoy?.hora_salida) return res.status(400).json({ error: `${usuario.nombre} ya registró su salida hoy` });
+      const result = await pool.query(
+        `UPDATE horarios SET hora_salida = NOW() WHERE usuario_id = $1 AND fecha = CURRENT_DATE RETURNING *`,
+        [usuario.id]
+      );
+      return res.json({ accion: 'salida', nombre: `${usuario.nombre} ${usuario.apellido}`, registro: result.rows[0] });
+    }
+
+    return res.status(400).json({ error: 'Accion invalida, debe ser entrada o salida' });
+  } catch (error) {
+    console.error('Error al fichar empleado:', error);
+    res.status(500).json({ error: 'Error al fichar' });
+  }
+});
+
 // POST /api/horarios/fichar — registrar entrada o salida manualmente
 router.post('/fichar', async (req, res) => {
   try {

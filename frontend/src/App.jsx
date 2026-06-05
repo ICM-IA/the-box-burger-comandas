@@ -10,6 +10,7 @@ import Comandas from './pages/Comandas';
 import Delivery from './pages/Delivery';
 import Caja from './pages/Caja';
 import Empleados from './pages/Empleados';
+import Fichaje from './pages/Fichaje';
 
 function Layout({ children }) {
   const [localId, setLocalId] = useState(null);
@@ -72,6 +73,12 @@ export default function App() {
       <Route path="/empleados" element={
         <ProtectedRoute roles={['admin']}>
           <Layout><Empleados /></Layout>
+        </ProtectedRoute>
+      } />
+
+      <Route path="/fichaje" element={
+        <ProtectedRoute roles={['admin', 'cajero']}>
+          <Layout><Fichaje /></Layout>
         </ProtectedRoute>
       } />
 

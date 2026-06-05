@@ -88,16 +88,29 @@ router.patch('/:id', soloAdmin, async (req, res) => {
 
 // DELETE /api/usuarios/:id (eliminación permanente)
 router.delete('/:id', soloAdmin, async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { rows } = await pool.query(
-      `DELETE FROM usuarios WHERE id = $1 RETURNING id`,
+    await client.query('BEGIN');
+
+    // Eliminar horarios primero (por integridad referencial)
+    await client.query('DELETE FROM horarios WHERE usuario_id = $1', [req.params.id]);
+
+    // Luego eliminar el usuario
+    const { rows } = await client.query(
+      `DELETE FROM usuarios WHERE id = $1 RETURNING id, nombre, apellido, email`,
       [req.params.id]
     );
+
+    await client.query('COMMIT');
+
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
-    res.json({ success: true });
+    res.json({ success: true, usuario: rows[0] });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error al eliminar usuario:', error);
-    res.status(500).json({ error: 'Error al eliminar usuario' });
+    res.status(500).json({ error: 'Error al eliminar usuario', detalle: error.message });
+  } finally {
+    client.release();
   }
 });
 

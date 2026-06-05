@@ -14,15 +14,18 @@ export default function Empleados() {
   const [editId, setEditId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
 
-  const cargar = async () => {
+  const cargar = async (fecha = null) => {
     try {
+      const fechaParam = fecha || fechaSeleccionada;
       const [emps, hors] = await Promise.all([
         api.get('/usuarios'),
-        api.get('/horarios/hoy'),
+        api.get(`/horarios?fecha=${fechaParam}`),
       ]);
       setEmpleados(emps);
       setHorarios(hors);
+      if (fecha) setFechaSeleccionada(fecha);
     } catch (err) {
       console.error('Error al cargar empleados:', err);
     } finally {
@@ -91,7 +94,16 @@ export default function Empleados() {
       </div>
 
       {/* Horarios del día */}
-      <div className="section-title" style={{ marginBottom: 12 }}>Asistencia de hoy ({horarios.length} registrados)</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div className="section-title" style={{ marginBottom: 0 }}>Asistencia ({horarios.length} registrados)</div>
+        <input
+          type="date"
+          value={fechaSeleccionada}
+          onChange={(e) => cargar(e.target.value)}
+          className="form-control"
+          style={{ width: 150, marginBottom: 0 }}
+        />
+      </div>
       <div className="tabla-wrapper" style={{ marginBottom: 24 }}>
         <table>
           <thead>

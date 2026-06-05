@@ -27,13 +27,24 @@ router.get('/hoy', soloAdmin, async (req, res) => {
 
 // GET /api/horarios — solo admin
 router.get('/', soloAdmin, async (req, res) => {
-  const { usuario_id, fecha_desde, fecha_hasta } = req.query;
-  let query = `SELECT h.*, u.nombre, u.apellido, u.rol FROM horarios h JOIN usuarios u ON h.usuario_id = u.id WHERE 1=1`;
+  const { usuario_id, fecha, fecha_desde, fecha_hasta, local_id } = req.query;
+  let query = `
+    SELECT h.*, u.nombre, u.apellido, u.rol, u.local_id,
+           l.nombre AS local_nombre
+    FROM horarios h
+    JOIN usuarios u ON h.usuario_id = u.id
+    LEFT JOIN locales l ON u.local_id = l.id
+    WHERE u.activo = true
+  `;
   const params = [];
   let n = 1;
+
   if (usuario_id)  { query += ` AND h.usuario_id = $${n++}`; params.push(usuario_id); }
+  if (fecha)       { query += ` AND h.fecha = $${n++}`;      params.push(fecha); }
   if (fecha_desde) { query += ` AND h.fecha >= $${n++}`;      params.push(fecha_desde); }
   if (fecha_hasta) { query += ` AND h.fecha <= $${n++}`;      params.push(fecha_hasta); }
+  if (local_id)    { query += ` AND u.local_id = $${n++}`;    params.push(local_id); }
+
   query += ' ORDER BY h.fecha DESC, h.hora_entrada DESC';
   try {
     const { rows } = await pool.query(query, params);

@@ -2,35 +2,72 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 
 const ROL_LABEL = { admin: 'Administrador', cocina: 'Cocina', cajero: 'Cajero', repartidor: 'Repartidor', empleado: 'Empleado' };
-const LOCALES = [{ id: 1, nombre: 'Entre Ríos' }, { id: 2, nombre: 'Edison' }];
 const FORM_VACIO = { nombre: '', apellido: '', email: '', password: '', rol: 'empleado', local_id: 1, activo: true };
+const MODULOS = [
+  { key: 'comandas', label: '📋 Comandas' },
+  { key: 'delivery', label: '🚚 Delivery' },
+  { key: 'caja',     label: '💼 Caja' },
+  { key: 'fichaje',  label: '🕐 Fichaje' },
+];
+const LOCAL_FORM_VACIO = { nombre: '', direccion: '', email: '', password: '', permisos: ['comandas', 'delivery', 'caja', 'fichaje'] };
 
 export default function Empleados() {
   const [empleados, setEmpleados] = useState([]);
   const [horarios, setHorarios] = useState([]);
+  const [locales, setLocales] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [modal, setModal] = useState(false);
+  const [modalLocal, setModalLocal] = useState(false);
   const [form, setForm] = useState(FORM_VACIO);
+  const [formLocal, setFormLocal] = useState(LOCAL_FORM_VACIO);
   const [editId, setEditId] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
+  const [errorLocal, setErrorLocal] = useState('');
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date().toISOString().split('T')[0]);
 
   const cargar = async (fecha = null) => {
     try {
       const fechaParam = fecha || fechaSeleccionada;
-      const [emps, hors] = await Promise.all([
+      const [emps, hors, locs] = await Promise.all([
         api.get('/usuarios'),
         api.get(`/horarios?fecha=${fechaParam}`),
+        api.get('/locales'),
       ]);
       setEmpleados(emps);
       setHorarios(hors);
+      setLocales(locs);
       if (fecha) setFechaSeleccionada(fecha);
     } catch (err) {
       console.error('Error al cargar empleados:', err);
     } finally {
       setCargando(false);
     }
+  };
+
+  const handleGuardarLocal = async (e) => {
+    e.preventDefault();
+    setErrorLocal('');
+    setGuardando(true);
+    try {
+      await api.post('/locales', formLocal);
+      await cargar();
+      setModalLocal(false);
+      setFormLocal(LOCAL_FORM_VACIO);
+    } catch (err) {
+      setErrorLocal(err.message);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const togglePermiso = (key) => {
+    setFormLocal(f => ({
+      ...f,
+      permisos: f.permisos.includes(key)
+        ? f.permisos.filter(p => p !== key)
+        : [...f.permisos, key],
+    }));
   };
 
   useEffect(() => { cargar(); }, []);
@@ -87,9 +124,10 @@ export default function Empleados() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>👥 Empleados</h2>
         <button className="btn btn-primary" onClick={() => abrirModal()}>+ Nuevo empleado</button>
+        <button className="btn btn-secondary" onClick={() => { setFormLocal(LOCAL_FORM_VACIO); setErrorLocal(''); setModalLocal(true); }}>🏠 Agregar local</button>
         <button className="btn btn-secondary btn-sm" onClick={cargar} style={{ marginLeft: 'auto' }}>↺ Actualizar</button>
       </div>
 
@@ -196,7 +234,7 @@ export default function Empleados() {
                 <div className="form-group">
                   <label>Local asignado</label>
                   <select className="form-control" value={form.local_id} onChange={(e) => setForm({ ...form, local_id: Number(e.target.value) })}>
-                    {LOCALES.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
+                    {locales.map((l) => <option key={l.id} value={l.id}>{l.nombre}</option>)}
                   </select>
                 </div>
               </div>
@@ -204,6 +242,56 @@ export default function Empleados() {
                 <button type="button" className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={guardando}>
                   {guardando ? 'Guardando...' : 'Guardar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Agregar Local */}
+      {modalLocal && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setModalLocal(false)}>
+          <div className="modal" style={{ maxWidth: 480 }}>
+            <div className="modal-title">🏠 Agregar local</div>
+            {errorLocal && <div className="login-error">{errorLocal}</div>}
+            <form onSubmit={handleGuardarLocal}>
+              <div className="form-group">
+                <label>Nombre del local</label>
+                <input className="form-control" value={formLocal.nombre} onChange={e => setFormLocal({...formLocal, nombre: e.target.value})} placeholder="Ej: Av. Colón" required />
+              </div>
+              <div className="form-group">
+                <label>Dirección (opcional)</label>
+                <input className="form-control" value={formLocal.direccion} onChange={e => setFormLocal({...formLocal, direccion: e.target.value})} placeholder="Ej: Av. Colón 1234" />
+              </div>
+              <div className="form-group">
+                <label>Email de acceso</label>
+                <input className="form-control" type="email" value={formLocal.email} onChange={e => setFormLocal({...formLocal, email: e.target.value})} placeholder="colon@theboxburger.com" required />
+              </div>
+              <div className="form-group">
+                <label>Contraseña de acceso</label>
+                <input className="form-control" type="password" value={formLocal.password} onChange={e => setFormLocal({...formLocal, password: e.target.value})} placeholder="••••••••" required />
+              </div>
+              <div className="form-group">
+                <label>Módulos que puede ver</label>
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+                  {MODULOS.map(m => (
+                    <label key={m.key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '8px 12px', borderRadius: 8, border: `1px solid ${formLocal.permisos.includes(m.key) ? 'var(--primary)' : 'var(--border)'}`, background: formLocal.permisos.includes(m.key) ? 'rgba(255,214,10,0.1)' : 'transparent' }}>
+                      <input
+                        type="checkbox"
+                        checked={formLocal.permisos.includes(m.key)}
+                        onChange={() => togglePermiso(m.key)}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      <span style={{ fontSize: 14 }}>{m.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setModalLocal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={guardando}>
+                  {guardando ? 'Creando...' : 'Crear local'}
                 </button>
               </div>
             </form>

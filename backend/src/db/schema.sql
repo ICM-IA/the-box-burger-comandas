@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   password_hash VARCHAR(255) NOT NULL,
   rol VARCHAR(50) NOT NULL CHECK (rol IN ('admin', 'cocina', 'cajero', 'repartidor', 'empleado')),
   local_id INTEGER REFERENCES locales(id),
+  permisos TEXT[] DEFAULT NULL,
   activo BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW()
 );

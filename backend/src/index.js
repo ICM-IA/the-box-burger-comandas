@@ -28,6 +28,7 @@ app.use('/api/pedidos', authMiddleware, require('./routes/pedidos'));
 app.use('/api/caja', authMiddleware, require('./routes/caja'));
 app.use('/api/usuarios', authMiddleware, require('./routes/usuarios'));
 app.use('/api/horarios', authMiddleware, require('./routes/horarios'));
+app.use('/api/locales', authMiddleware, require('./routes/locales'));
 
 app.get('/api/health', async (req, res) => {
   try {
@@ -63,6 +64,14 @@ async function iniciar() {
       console.log('✅ CHECK constraint actualizado para rol empleado');
     } catch (error) {
       console.log('ℹ️  Constraint ya existe o no necesita actualización');
+    }
+
+    // Agregar columna permisos si no existe
+    try {
+      await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permisos TEXT[] DEFAULT NULL`);
+      console.log('✅ Columna permisos lista');
+    } catch (error) {
+      console.log('ℹ️  Columna permisos ya existe');
     }
 
     await sembrarDatos();

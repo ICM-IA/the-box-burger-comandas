@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 
 function formatHora(ts) {
   if (!ts) return '—';
@@ -12,149 +13,160 @@ const LOCALES = [
 ];
 
 export default function Fichaje() {
+  const { usuario } = useAuth();
+  const esAdmin = usuario?.rol === 'admin';
+
+  const [localId, setLocalId] = useState(1);
   const [empleados, setEmpleados] = useState([]);
   const [horarios, setHorarios] = useState([]);
-  const [localId, setLocalId] = useState(1);
-  const [modal, setModal] = useState(null); // { empleado, accion }
-  const [email, setEmail] = useState('');
+  const [modal, setModal] = useState(null);
   const [password, setPassword] = useState('');
+  const [verPass, setVerPass] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
 
-  const cargar = async () => {
+  // Setear localId según el usuario logueado
+  useEffect(() => {
+    if (!esAdmin && usuario?.local_id) {
+      setLocalId(usuario.local_id);
+    }
+  }, [usuario?.local_id]);
+
+  // Cargar empleados y horarios cada vez que cambia localId
+  useEffect(() => {
+    fetchData();
+  }, [localId]);
+
+  async function fetchData() {
     try {
+      const fecha = new Date().toISOString().split('T')[0];
       const [emps, hors] = await Promise.all([
-        api.get('/usuarios'),
-        api.get(`/horarios?fecha=${new Date().toISOString().split('T')[0]}`),
+        api.get(`/usuarios?local_id=${localId}`),
+        api.get(`/horarios?fecha=${fecha}&local_id=${localId}`),
       ]);
-      // Filtrar solo roles empleado, cocina, cajero, repartidor (no admin)
-      setEmpleados(emps.filter(e => e.rol !== 'admin'));
+      setEmpleados(emps.filter(e => e.rol === 'empleado'));
       setHorarios(hors);
     } catch (err) {
-      console.error('Error al cargar:', err);
+      console.error('Error:', err);
     }
-  };
+  }
 
-  useEffect(() => { cargar(); }, []);
+  function horarioDeHoy(userId) {
+    return horarios.find(h => h.usuario_id === userId);
+  }
 
-  const empleadosFiltrados = localId
-    ? empleados.filter(e => e.local_id === localId)
-    : empleados;
-
-  const abrirModal = (empleado, accion) => {
-    setModal({ empleado, accion });
-    setEmail(empleado.email);
+  function abrirModal(emp, accion) {
+    setModal({ emp, accion });
     setPassword('');
+    setVerPass(false);
     setMensaje(null);
-  };
+  }
 
-  const cerrarModal = () => {
+  function cerrarModal() {
     setModal(null);
-    setEmail('');
     setPassword('');
+    setVerPass(false);
     setMensaje(null);
-  };
+  }
 
-  const handleFichar = async (e) => {
+  async function handleFichar(e) {
     e.preventDefault();
     setCargando(true);
     setMensaje(null);
     try {
       const res = await api.post('/horarios/fichar-empleado', {
-        email,
+        email: modal.emp.email,
         password,
         accion: modal.accion,
       });
       setMensaje({ tipo: 'ok', texto: `✅ ${modal.accion === 'entrada' ? 'Entrada' : 'Salida'} registrada para ${res.nombre}` });
-      await cargar();
+      await fetchData();
       setTimeout(() => cerrarModal(), 1500);
     } catch (err) {
       setMensaje({ tipo: 'error', texto: err.message });
     } finally {
       setCargando(false);
     }
-  };
-
-  const horarioDeHoy = (userId) => horarios.find(h => h.usuario_id === userId);
+  }
 
   return (
     <div>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <h2 style={{ fontSize: 20, fontWeight: 800 }}>🕐 Fichaje</h2>
-        <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
-          {LOCALES.map(l => (
-            <button
-              key={l.id}
-              onClick={() => setLocalId(l.id)}
-              className={localId === l.id ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
-            >
-              {l.nombre}
-            </button>
-          ))}
-        </div>
-        <button className="btn btn-secondary btn-sm" onClick={cargar} style={{ marginLeft: 'auto' }}>↺ Actualizar</button>
+
+        {esAdmin ? (
+          <div style={{ display: 'flex', gap: 8, marginLeft: 8 }}>
+            {LOCALES.map(l => (
+              <button
+                key={l.id}
+                onClick={() => setLocalId(l.id)}
+                className={localId === l.id ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+              >
+                {l.nombre}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span style={{ marginLeft: 8, fontWeight: 700, color: 'var(--primary)', fontSize: 14 }}>
+            {LOCALES.find(l => l.id === localId)?.nombre}
+          </span>
+        )}
+
+        <button className="btn btn-secondary btn-sm" onClick={fetchData} style={{ marginLeft: 'auto' }}>
+          ↺ Actualizar
+        </button>
       </div>
 
+      {/* Lista de empleados */}
       <div style={{ display: 'grid', gap: 12 }}>
-        {empleadosFiltrados.length === 0 && (
-          <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>No hay empleados en este local</div>
+        {empleados.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 40 }}>
+            No hay empleados en este local
+          </div>
         )}
-        {empleadosFiltrados.map(emp => {
+        {empleados.map(emp => {
           const hoy = horarioDeHoy(emp.id);
           const entro = hoy?.hora_entrada != null;
           const salio = hoy?.hora_salida != null;
 
           return (
             <div key={emp.id} style={{
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '16px 20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 12, padding: '16px 20px',
+              display: 'flex', alignItems: 'center', gap: 16,
             }}>
-              {/* Avatar */}
               <div style={{
                 width: 44, height: 44, borderRadius: '50%',
                 background: 'var(--primary)', color: '#000',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontWeight: 800, fontSize: 16, flexShrink: 0,
               }}>
-                {emp.nombre[0]}{emp.apellido[0]}
+                {emp.nombre[0]}{emp.apellido?.[0] || ''}
               </div>
 
-              {/* Info */}
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{emp.nombre} {emp.apellido}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                  {emp.local_nombre || 'Sin local'} ·{' '}
                   {entro ? (
                     <span style={{ color: 'var(--green)' }}>
                       Entró {formatHora(hoy.hora_entrada)}
                       {salio ? ` · Salió ${formatHora(hoy.hora_salida)}` : ' · Trabajando'}
                     </span>
                   ) : (
-                    <span style={{ color: 'var(--text-3)' }}>Sin fichar hoy</span>
+                    <span>Sin fichar hoy</span>
                   )}
                 </div>
               </div>
 
-              {/* Botones */}
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 {!entro && (
-                  <button
-                    className="btn btn-primary btn-sm"
-                    onClick={() => abrirModal(emp, 'entrada')}
-                  >
+                  <button className="btn btn-primary btn-sm" onClick={() => abrirModal(emp, 'entrada')}>
                     🟢 Fichar entrada
                   </button>
                 )}
                 {entro && !salio && (
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => abrirModal(emp, 'salida')}
-                  >
+                  <button className="btn btn-danger btn-sm" onClick={() => abrirModal(emp, 'salida')}>
                     🔴 Fichar salida
                   </button>
                 )}
@@ -169,13 +181,13 @@ export default function Fichaje() {
 
       {/* Modal */}
       {modal && (
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && cerrarModal()}>
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && cerrarModal()}>
           <div className="modal" style={{ maxWidth: 400 }}>
             <div className="modal-title">
               {modal.accion === 'entrada' ? '🟢 Fichar entrada' : '🔴 Fichar salida'}
             </div>
             <p style={{ color: 'var(--text-2)', fontSize: 14, marginBottom: 20 }}>
-              {modal.empleado.nombre} {modal.empleado.apellido} — ingresá tu contraseña para confirmar
+              {modal.emp.nombre} {modal.emp.apellido} — ingresá tu contraseña para confirmar
             </p>
 
             {mensaje && (
@@ -192,15 +204,29 @@ export default function Fichaje() {
             <form onSubmit={handleFichar}>
               <div className="form-group">
                 <label>Contraseña</label>
-                <input
-                  className="form-control"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoFocus
-                  required
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    className="form-control"
+                    type={verPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoFocus
+                    required
+                    style={{ paddingRight: 44 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVerPass(!verPass)}
+                    style={{
+                      position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--text-3)', fontSize: 18, padding: 0, lineHeight: 1,
+                    }}
+                  >
+                    {verPass ? '🙈' : '👁️'}
+                  </button>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>

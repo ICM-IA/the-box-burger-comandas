@@ -9,6 +9,7 @@ export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [verPass, setVerPass] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,15 +51,29 @@ export default function Login() {
           </div>
           <div className="form-group">
             <label>Contraseña</label>
-            <input
-              className="form-control"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                className="form-control"
+                type={verPass ? 'text' : 'password'}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                required
+                style={{ paddingRight: 44 }}
+              />
+              <button
+                type="button"
+                onClick={() => setVerPass(!verPass)}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--text-3)', fontSize: 18, padding: 0, lineHeight: 1,
+                }}
+              >
+                {verPass ? '🙈' : '👁️'}
+              </button>
+            </div>
           </div>
           <button className="btn btn-primary btn-full btn-lg" type="submit" disabled={cargando}>
             {cargando ? 'Ingresando...' : 'Ingresar'}

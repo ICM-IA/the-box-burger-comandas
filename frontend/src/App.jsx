@@ -32,7 +32,7 @@ function HomeRedirect() {
   const { usuario } = useAuth();
   if (!usuario) return <Navigate to="/login" replace />;
   if (usuario.rol === 'empleado') return <Navigate to="/fichar" replace />;
-  if (usuario.rol === 'cajero')   return <Navigate to="/caja" replace />;
+  if (usuario.rol === 'cajero')   return <Navigate to="/comandas" replace />;
   if (usuario.rol === 'repartidor') return <Navigate to="/delivery" replace />;
   return <Navigate to="/comandas" replace />;
 }
@@ -53,7 +53,7 @@ export default function App() {
 
       {/* Páginas del sistema operativo */}
       <Route path="/comandas" element={
-        <ProtectedRoute roles={['admin', 'cocina']}>
+        <ProtectedRoute roles={['admin', 'cocina', 'cajero']}>
           <Layout>{({ localId }) => <Comandas localId={localId} />}</Layout>
         </ProtectedRoute>
       } />

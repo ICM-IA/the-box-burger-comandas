@@ -47,6 +47,7 @@ router.post('/login', async (req, res) => {
         email: usuario.email,
         rol: usuario.rol,
         local_id: usuario.local_id,
+        permisos: usuario.permisos || null,
       },
     });
   } catch (error) {

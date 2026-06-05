@@ -14,13 +14,24 @@ export default function Sidebar() {
   const [expanded, setExpanded] = useState(false);
   const { usuario } = useAuth();
 
-  const links = [
-    { to: '/comandas',  icon: <IconComandas />,  label: 'Comandas',  roles: ['admin', 'cocina'] },
-    { to: '/delivery',  icon: <IconDelivery />,  label: 'Delivery',  roles: ['admin', 'repartidor', 'cajero'] },
-    { to: '/caja',      icon: <IconCaja />,      label: 'Caja',      roles: ['admin', 'cajero'] },
-    { to: '/empleados', icon: <IconEmpleados />, label: 'Empleados', roles: ['admin'] },
-    { to: '/fichaje',   icon: <IconFichaje />,   label: 'Fichaje',   roles: ['admin', 'cajero'] },
-  ].filter((l) => l.roles.includes(usuario?.rol));
+  const permisos = usuario?.permisos; // null = usa defaults por rol
+
+  const allLinks = [
+    { to: '/comandas',  icon: <IconComandas />,  label: 'Comandas',  key: 'comandas',  roles: ['admin', 'cocina', 'cajero'] },
+    { to: '/delivery',  icon: <IconDelivery />,  label: 'Delivery',  key: 'delivery',  roles: ['admin', 'repartidor', 'cajero'] },
+    { to: '/caja',      icon: <IconCaja />,      label: 'Caja',      key: 'caja',      roles: ['admin', 'cajero'] },
+    { to: '/empleados', icon: <IconEmpleados />, label: 'Empleados', key: 'empleados', roles: ['admin'] },
+    { to: '/fichaje',   icon: <IconFichaje />,   label: 'Fichaje',   key: 'fichaje',   roles: ['admin', 'cajero'] },
+  ];
+
+  const links = allLinks.filter(l => {
+    if (!usuario) return false;
+    if (usuario.rol === 'admin') return true;
+    // Si tiene permisos personalizados, usarlos
+    if (permisos) return permisos.includes(l.key);
+    // Si no, usar los defaults por rol
+    return l.roles.includes(usuario.rol);
+  });
 
   // El rol empleado tiene su propia página sin sidebar
   if (usuario?.rol === 'empleado') return null;

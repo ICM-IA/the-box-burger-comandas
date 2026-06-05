@@ -1,54 +1,74 @@
 version: '3.8'
 
 services:
+  # Base de datos PostgreSQL
   postgres:
-    image: postgres:16-alpine
-    container_name: theboxburger-postgres
+    image: postgres:15-alpine
+    container_name: theboxburger-db
     environment:
-      POSTGRES_DB: theboxburger
       POSTGRES_USER: theboxburger
       POSTGRES_PASSWORD: ${DB_PASSWORD:-theboxburger_pass}
-      TZ: America/Argentina/Buenos_Aires
+      POSTGRES_DB: theboxburger
+      PGTZ: America/Argentina/Buenos_Aires
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     ports:
       - "5432:5432"
-    restart: unless-stopped
+    networks:
+      - theboxburger-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U theboxburger"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  # Backend - Node.js + Express
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: theboxburger-backend
-    environment:
-      DATABASE_URL: postgresql://theboxburger:${DB_PASSWORD:-theboxburger_pass}@postgres:5432/theboxburger
-      JWT_SECRET: ${JWT_SECRET:-cambiar_por_secreto_seguro}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-cambiar_por_secreto_seguro}
-      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
-      PORT: 3001
-      TZ: America/Argentina/Buenos_Aires
-    ports:
-      - "3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://theboxburger:${DB_PASSWORD:-theboxburger_pass}@postgres:5432/theboxburger?options=-c timezone=America/Argentina/Buenos_Aires
+      JWT_SECRET: ${JWT_SECRET:-cambiar_por_un_secreto_muy_largo_y_seguro}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-cambiar_por_otro_secreto_seguro}
+      N8N_WEBHOOK_NUEVOS: ${N8N_WEBHOOK_NUEVOS:-}
+      N8N_WEBHOOK_EN_COCINA: ${N8N_WEBHOOK_EN_COCINA:-}
+      N8N_WEBHOOK_LISTOS: ${N8N_WEBHOOK_LISTOS:-}
+    ports:
+      - "3001:3001"
+    networks:
+      - theboxburger-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # Frontend - React + Nginx
   frontend:
     build:
-      context: ./frontend
-      args:
-        - VITE_APP_VERSION=1.0.0
+      context: .
+      dockerfile: Dockerfile.frontend
     container_name: theboxburger-frontend
-    ports:
-      - "3000:80"
     depends_on:
       - backend
+    ports:
+      - "80:80"
+    networks:
+      - theboxburger-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
+    driver: local
+
+networks:
+  theboxburger-network:
+    driver: bridge

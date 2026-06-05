@@ -172,6 +172,31 @@ router.post('/nuevo-pedido', webhookAuth, async (req, res) => {
       ]);
     }
 
+    // Registrar monto en caja según método de pago
+    if (totalFinal > 0) {
+      const metodo = metodo_pago || 'efectivo';
+      const columna = {
+        'efectivo': 'total_efectivo',
+        'mercadopago': 'total_mp',
+        'transferencia': 'total_transferencia',
+        'tarjeta': 'total_mp',
+        'qr': 'total_mp'
+      }[metodo] || 'total_efectivo';
+
+      await client.query(`
+        INSERT INTO caja (local_id, fecha, total_efectivo, total_mp, total_transferencia)
+        VALUES ($1, CURRENT_DATE,
+          CASE WHEN $2 = 'total_efectivo' THEN $3 ELSE 0 END,
+          CASE WHEN $2 = 'total_mp' THEN $3 ELSE 0 END,
+          CASE WHEN $2 = 'total_transferencia' THEN $3 ELSE 0 END
+        )
+        ON CONFLICT (local_id, fecha) DO UPDATE SET
+          total_efectivo = total_efectivo + CASE WHEN $2 = 'total_efectivo' THEN $3 ELSE 0 END,
+          total_mp = total_mp + CASE WHEN $2 = 'total_mp' THEN $3 ELSE 0 END,
+          total_transferencia = total_transferencia + CASE WHEN $2 = 'total_transferencia' THEN $3 ELSE 0 END
+      `, [local_id, columna, totalFinal]);
+    }
+
     await client.query('COMMIT');
 
     // Obtener pedido completo con items para el socket

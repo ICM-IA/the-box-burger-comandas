@@ -80,6 +80,118 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// POST /api/pedidos — crear pedido manualmente (mostrador)
+router.post('/', async (req, res) => {
+  const {
+    local_id, cliente_nombre, cliente_telefono, cliente_direccion,
+    tipo, direccion_entrega, distancia_km = 0, costo_envio = 0,
+    subtotal = 0, total = 0, metodo_pago = 'efectivo',
+    items = [], notas = ''
+  } = req.body;
+
+  if (!local_id || !cliente_nombre || !total) {
+    return res.status(400).json({ error: 'Faltan campos requeridos: local_id, cliente_nombre, total' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Generar número de pedido correlativo
+    const contadorRes = await client.query(`
+      SELECT COUNT(*) + 1 AS siguiente
+      FROM pedidos
+      WHERE local_id = $1
+        AND DATE(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires') = CURRENT_DATE
+    `, [local_id]);
+
+    const prefijo = local_id === 2 ? 'ED' : 'ER';
+    const numero_pedido = `${prefijo}-${String(contadorRes.rows[0].siguiente).padStart(4, '0')}`;
+
+    // Crear cliente
+    let cliente_id = null;
+    if (cliente_nombre) {
+      const cliRes = await client.query(`
+        INSERT INTO clientes (nombre, telefono, direccion_habitual, local_asignado, total_pedidos)
+        VALUES ($1, $2, $3, $4, 1) RETURNING id
+      `, [cliente_nombre, cliente_telefono || null, cliente_direccion || null, local_id]);
+      cliente_id = cliRes.rows[0].id;
+    }
+
+    // Crear pedido
+    const pedidoRes = await client.query(`
+      INSERT INTO pedidos (
+        numero_pedido, local_id, cliente_id, canal, tipo, estado,
+        direccion_entrega, distancia_km, costo_envio, subtotal, total,
+        metodo_pago, notas
+      ) VALUES ($1, $2, $3, 'mostrador', $4, 'nuevo', $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+    `, [
+      numero_pedido, local_id, cliente_id, tipo || 'retiro',
+      direccion_entrega || null, distancia_km, costo_envio,
+      subtotal || total, total, metodo_pago, notas || null
+    ]);
+
+    const pedido = pedidoRes.rows[0];
+
+    // Insertar items
+    for (const item of items) {
+      await client.query(`
+        INSERT INTO pedido_items (pedido_id, nombre_producto, cantidad, precio_unitario, subtotal, personalizaciones)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        pedido.id,
+        item.nombre_producto,
+        item.cantidad || 1,
+        item.precio_unitario || 0,
+        (item.cantidad || 1) * (item.precio_unitario || 0),
+        item.personalizaciones || null
+      ]);
+    }
+
+    // Registrar monto en caja
+    if (total > 0) {
+      const columna = {
+        'efectivo': 'total_efectivo',
+        'mercadopago': 'total_mp',
+        'transferencia': 'total_transferencia',
+        'tarjeta': 'total_mp',
+        'qr': 'total_mp'
+      }[metodo_pago] || 'total_efectivo';
+
+      await client.query(`
+        INSERT INTO caja (local_id, fecha, total_efectivo, total_mp, total_transferencia)
+        VALUES ($1, CURRENT_DATE,
+          CASE WHEN $2 = 'total_efectivo' THEN $3 ELSE 0 END,
+          CASE WHEN $2 = 'total_mp' THEN $3 ELSE 0 END,
+          CASE WHEN $2 = 'total_transferencia' THEN $3 ELSE 0 END
+        )
+        ON CONFLICT (local_id, fecha) DO UPDATE SET
+          total_efectivo = total_efectivo + CASE WHEN $2 = 'total_efectivo' THEN $3 ELSE 0 END,
+          total_mp = total_mp + CASE WHEN $2 = 'total_mp' THEN $3 ELSE 0 END,
+          total_transferencia = total_transferencia + CASE WHEN $2 = 'total_transferencia' THEN $3 ELSE 0 END
+      `, [local_id, columna, total]);
+    }
+
+    await client.query('COMMIT');
+
+    // Obtener pedido completo
+    const completo = await pool.query(`
+      ${SELECT_PEDIDO} WHERE p.id = $1 GROUP BY p.id, c.nombre, c.telefono, l.nombre, u.nombre, u.apellido
+    `, [pedido.id]);
+
+    req.app.get('io').emit('nuevo_pedido', completo.rows[0]);
+
+    res.status(201).json({ success: true, pedido: completo.rows[0], numero_pedido });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al crear pedido:', error);
+    res.status(500).json({ error: 'Error al crear pedido', detalle: error.message });
+  } finally {
+    client.release();
+  }
+});
+
 // PATCH /api/pedidos/:id/estado
 router.patch('/:id/estado', async (req, res) => {
   const { estado } = req.body;

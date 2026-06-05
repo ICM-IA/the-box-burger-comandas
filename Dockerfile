@@ -9,7 +9,6 @@ RUN npm ci --only=production
 
 # Copiar código
 COPY backend/src ./src
-COPY backend/public ./public
 
 # Exponer puerto
 EXPOSE 3001

@@ -86,18 +86,18 @@ router.patch('/:id', soloAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/usuarios/:id (soft delete)
+// DELETE /api/usuarios/:id (eliminación permanente)
 router.delete('/:id', soloAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `UPDATE usuarios SET activo = false WHERE id = $1 RETURNING id`,
+      `DELETE FROM usuarios WHERE id = $1 RETURNING id`,
       [req.params.id]
     );
     if (!rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
     res.json({ success: true });
   } catch (error) {
-    console.error('Error al desactivar usuario:', error);
-    res.status(500).json({ error: 'Error al desactivar usuario' });
+    console.error('Error al eliminar usuario:', error);
+    res.status(500).json({ error: 'Error al eliminar usuario' });
   }
 });
 

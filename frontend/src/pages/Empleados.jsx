@@ -70,8 +70,8 @@ export default function Empleados() {
     }
   };
 
-  const handleDesactivar = async (id) => {
-    if (!confirm('¿Desactivar este empleado?')) return;
+  const handleEliminar = async (id, nombre) => {
+    if (!confirm(`¿Eliminar definitivamente a ${nombre}? Esta acción no se puede deshacer.`)) return;
     try {
       await api.delete(`/usuarios/${id}`);
       await cargar();
@@ -140,9 +140,7 @@ export default function Empleados() {
                   <td>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button className="btn btn-secondary btn-sm" onClick={() => abrirModal(emp)}>Editar</button>
-                      {emp.activo && (
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDesactivar(emp.id)}>Desactivar</button>
-                      )}
+                      <button className="btn btn-danger btn-sm" onClick={() => handleEliminar(emp.id, `${emp.nombre} ${emp.apellido}`)}>Eliminar</button>
                     </div>
                   </td>
                 </tr>
@@ -190,15 +188,6 @@ export default function Empleados() {
                   </select>
                 </div>
               </div>
-              {editId && (
-                <div className="form-group">
-                  <label>Estado</label>
-                  <select className="form-control" value={form.activo ? 'true' : 'false'} onChange={(e) => setForm({ ...form, activo: e.target.value === 'true' })}>
-                    <option value="true">Activo</option>
-                    <option value="false">Inactivo</option>
-                  </select>
-                </div>
-              )}
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={cerrarModal}>Cancelar</button>
                 <button type="submit" className="btn btn-primary" disabled={guardando}>

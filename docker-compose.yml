@@ -22,7 +22,9 @@ services:
       retries: 5
 
   backend:
-    image: icmia/theboxburger-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: theboxburger-backend
     depends_on:
       postgres:
@@ -30,7 +32,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://theboxburger:${DB_PASSWORD:-theboxburger_pass}@postgres:5432/theboxburger?options=-c timezone=America/Argentina/Buenos_Aires
+      DATABASE_URL: postgresql://theboxburger:${DB_PASSWORD:-theboxburger_pass}@postgres:5432/theboxburger
       JWT_SECRET: ${JWT_SECRET:-cambiar_por_un_secreto_muy_largo_y_seguro}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-cambiar_por_otro_secreto_seguro}
       N8N_WEBHOOK_NUEVOS: ${N8N_WEBHOOK_NUEVOS:-}
@@ -48,7 +50,9 @@ services:
       retries: 3
 
   frontend:
-    image: icmia/theboxburger-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     container_name: theboxburger-frontend
     depends_on:
       - backend

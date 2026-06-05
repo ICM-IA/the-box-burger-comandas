@@ -56,6 +56,7 @@ export default function Fichar() {
   const [cargando, setCargando] = useState(true);
   const [fichando, setFichando] = useState(false);
   const [mensaje, setMensaje] = useState(null); // { tipo: 'ok'|'error', texto }
+  const [horasTrabajadas, setHorasTrabajadas] = useState(0); // contador en tiempo real
 
   const cargar = async () => {
     try {
@@ -73,6 +74,18 @@ export default function Fichar() {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Actualizar contador de horas cada segundo si está trabajando
+  useEffect(() => {
+    if (!estado?.hora_entrada || estado?.hora_salida) return;
+    const timer = setInterval(() => {
+      const entrada = new Date(estado.hora_entrada);
+      const ahora = new Date();
+      const diff = (ahora - entrada) / 3600000; // horas
+      setHorasTrabajadas(diff);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [estado]);
 
   const handleFichar = async () => {
     setFichando(true);
@@ -151,6 +164,12 @@ export default function Fichar() {
                   <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-2)', fontVariantNumeric: 'tabular-nums' }}>{formatHora(estado.hora_salida)}</div>
                 </div>
               )}
+              {yaEntro && !yaSalio && (
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 4 }}>Tiempo trabajado</div>
+                  <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>{formatHoras(horasTrabajadas)}</div>
+                </div>
+              )}
             </div>
           )}
 
@@ -166,15 +185,24 @@ export default function Fichar() {
             </div>
           )}
 
-          {/* Botón principal */}
-          {!turnoOk ? (
+          {/* Botones */}
+          {!yaEntro ? (
             <button
               className="btn btn-primary btn-full"
               style={{ fontSize: 18, padding: '18px 0', borderRadius: 12 }}
               onClick={handleFichar}
               disabled={fichando}
             >
-              {fichando ? 'Registrando...' : !yaEntro ? '🟢 Registrar Entrada' : '🔴 Registrar Salida'}
+              {fichando ? 'Registrando...' : '🟢 A trabajar'}
+            </button>
+          ) : !yaSalio ? (
+            <button
+              className="btn btn-danger btn-full"
+              style={{ fontSize: 18, padding: '18px 0', borderRadius: 12 }}
+              onClick={handleFichar}
+              disabled={fichando}
+            >
+              {fichando ? 'Registrando...' : '🔴 Registrar salida'}
             </button>
           ) : (
             <div style={{ padding: '16px', background: 'rgba(45,198,83,0.1)', border: '1px solid rgba(45,198,83,0.3)', borderRadius: 10, color: 'var(--green)', fontWeight: 700 }}>

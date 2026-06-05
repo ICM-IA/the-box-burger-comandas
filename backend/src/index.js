@@ -53,6 +53,18 @@ async function iniciar() {
     const schema = fs.readFileSync(path.join(__dirname, 'db/schema.sql'), 'utf8');
     await pool.query(schema);
 
+    // Actualizar CHECK constraint para permitir rol 'empleado'
+    try {
+      await pool.query(`
+        ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check;
+        ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check
+          CHECK (rol IN ('admin', 'cocina', 'cajero', 'repartidor', 'empleado'));
+      `);
+      console.log('✅ CHECK constraint actualizado para rol empleado');
+    } catch (error) {
+      console.log('ℹ️  Constraint ya existe o no necesita actualización');
+    }
+
     await sembrarDatos();
 
     httpServer.listen(PORT, '0.0.0.0', () => {
